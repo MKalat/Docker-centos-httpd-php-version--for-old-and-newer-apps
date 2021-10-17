@@ -1,0 +1,44 @@
+FROM centos:7
+
+# Fix incompatibility between Docker and systemd
+# copy/paste from https://forums.docker.com/t/systemctl-status-is-not-working-in-my-docker-container/9075/4
+# additional steps from https://github.com/CentOS/sig-cloud-instance-images/issues/41
+RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+    rm -f /lib/systemd/system/multi-user.target.wants/*; \
+    rm -f /etc/systemd/system/*.wants/*; \
+    rm -f /lib/systemd/system/local-fs.target.wants/*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+    rm -f /lib/systemd/system/basic.target.wants/*; \
+    rm -f /lib/systemd/system/anaconda.target.wants/*; \
+    mkdir -p /etc/selinux/targeted/contexts/ &&\
+    echo '<busconfig><selinux></selinux></busconfig>' > /etc/selinux/targeted/contexts/dbus_contexts
+
+VOLUME [ "/sys/fs/cgroup" ]
+
+RUN systemctl mask dev-mqueue.mount dev-hugepages.mount \
+     systemd-remount-fs.service sys-kernel-config.mount \
+     sys-kernel-debug.mount sys-fs-fuse-connections.mount \
+     graphical.target systemd-logind.service \
+     NetworkManager.service systemd-hostnamed.service
+
+STOPSIGNAL SIGRTMIN+3
+
+RUN yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+RUN yum -y install http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+RUN yum -y install yum-utils
+RUN yum -y update
+RUN yum-config-manager --enable remi-php56
+RUN yum -y update
+
+RUN yum -y update && yum -y install gzip wget zip unzip nginx php php-cli php-fpm php-common php-xml php-zip php-gd php-json php-intl php-mbstring php-pdo php-mysqlnd
+
+RUN yum -y update && yum -y install supervisor
+#RUN mkdir /var/run/php-fpm
+
+
+#ADD --chown=root:root /opt/etc/docker_centos_httpd/httpd /etc/nginx/
+
+
+CMD ["/usr/sbin/nginx", "-g", "daemon off;"]
+
